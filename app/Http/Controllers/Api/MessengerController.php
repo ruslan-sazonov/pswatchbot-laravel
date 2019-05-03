@@ -4,7 +4,10 @@ namespace App\Http\Controllers\Api;
 
 
 use App\Bot\Manager;
+use App\Bot\DTO\Product;
 use App\PSN\Store as PsnStore;
+use App\Models\MessengerWatchItem;
+use App\Models\MessengerUser;
 use App\Http\Controllers\Controller;
 
 class MessengerController extends Controller
@@ -118,7 +121,8 @@ class MessengerController extends Controller
     }
 
     /**
-     * @param \Kerox\Messenger\Event\MessageEvent $event
+     * @param $event
+     * @throws \GuzzleHttp\Exception\GuzzleException
      */
     protected function handleMessage($event)
     {
@@ -133,12 +137,8 @@ class MessengerController extends Controller
                     if ($productId = $this->createOrUpdateWatchItem($productData, $senderId)) {
                         $this->bot->itemAdded($senderId);
 
-
-                        $product = \App\Models\MessengerWatchItem::find($productId);
-                        $productCard = $this->bot->getSingleProductCard(
-                            $product
-                        );
-
+                        $product = new Product($productData);
+                        $productCard = $this->bot->getSingleProductCard($product);
                         $this->bot->sendProductCard($senderId, $productCard);
                         die();
 
@@ -180,7 +180,7 @@ class MessengerController extends Controller
      */
     protected function createOrUpdateUser(int $recipientId, $user)
     {
-        $userModel = \App\Models\MessengerUser::firstOrNew(
+        $userModel = MessengerUser::firstOrNew(
             ['recipient_id' => $recipientId]
         );
 
@@ -199,18 +199,19 @@ class MessengerController extends Controller
      */
     protected function createOrUpdateWatchItem(array $item, int $userId): int
     {
-        $itemModel = \App\Models\MessengerWatchItem::firstOrNew([
+        $itemModel = MessengerWatchItem::firstOrNew([
             'recipient_id' => $userId,
             'product_id' => $item['api-handle']
         ]);
 
         $itemModel->recipient_id = $userId;
-        $itemModel->product_id = (!empty($item['api-handle'])) ? $item['api-handle'] : null;
-        $itemModel->name = (!empty($item['name'])) ? $item['name'] : null;
-        $itemModel->image = (!empty($item['image'])) ? $item['image'] : null;
-        $itemModel->store_url = (!empty($item['store-url'])) ? $item['store-url'] : null;
-        $itemModel->api_url = (!empty($item['api-url'])) ? $item['api-url'] : null;
-        $itemModel->fetched_at = (!empty($item['fetched-at'])) ? date('Y-m-d G:m:s', $item['fetched-at']) : null;
+        $itemModel->product_id = $item['api-handle'] ?? null;
+        $itemModel->name = $item['name'] ?? null;
+        $itemModel->image = $item['image'] ?? null;
+        $itemModel->store_url = $item['store-url'] ?? null;
+        $itemModel->api_url = $item['api-url'] ?? null;
+        $itemModel->prices = $item['prices'] ?? null;
+        $itemModel->fetched_at = $item['fetched-at'] ?? null;
         $itemModel->save();
 
         return $itemModel->id;

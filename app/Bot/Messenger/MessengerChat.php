@@ -6,6 +6,7 @@ namespace App\Bot\Messenger;
 use App\Bot\Dialogs;
 use App\Bot\Interfaces\ChatInterface;
 use App\Bot\Interfaces\ClientInterface;
+use App\Bot\Interfaces\DTO\ProductInterface;
 use Kerox\Messenger\Model\Message;
 use Kerox\Messenger\Model\Common\Button\WebUrl;
 use Kerox\Messenger\Model\Message\Attachment\Template\Element\GenericElement;
@@ -84,15 +85,20 @@ class MessengerChat implements ChatInterface
         $this->client->sendMessage($userId, $message);
     }
 
-    public function getSingleProductCard($product)
+    /**
+     * @param \App\Bot\Interfaces\DTO\ProductInterface $product
+     * @return GenericElement
+     * @throws \Kerox\Messenger\Exception\MessengerException
+     */
+    public function getSingleProductCard(ProductInterface $product)
     {
         //TODO: get a proper set of buttons
 
-        return GenericElement::create($product->name)
-            ->setImageUrl($product->image)
-            ->setSubtitle('test subtitle')
+        return GenericElement::create($product->getTitleAsText())
+            ->setImageUrl($product->getImageUrl())
+            ->setSubtitle($product->getPricesAsText())
             ->setButtons([
-                WebUrl::create('Open in Store', $product->store_url)
+                WebUrl::create('Open in Store', $product->getStoreUrl())
             ]);
     }
 
