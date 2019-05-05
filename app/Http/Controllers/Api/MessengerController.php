@@ -195,6 +195,9 @@ class MessengerController extends Controller
      */
     protected function sendWatchList($senderId): void
     {
+        //TODO: handle carousel card's max count
+        // Up to 10 generic templates in one carousel
+        // See eloquent batching
         $products = $this->getProductsByUserId($senderId);
 
         if ($products->isNotEmpty()) {
