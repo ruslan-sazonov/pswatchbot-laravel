@@ -31,6 +31,11 @@ class MessengerController extends Controller
     protected $client;
 
     /**
+     * @var int
+     */
+    protected $userId;
+
+    /**
      * MessengerController constructor.
      * @param \App\Bot\Manager $botManager
      * @param \App\PSN\Store $store
@@ -69,11 +74,12 @@ class MessengerController extends Controller
     }
 
     /**
-     * @param \Kerox\Messenger\Event\AbstractEvent $event
+     * @param $event
+     * @throws \GuzzleHttp\Exception\GuzzleException
      */
     protected function handleEvent($event)
     {
-        $senderId = $event->getSenderId();
+        $this->userId = $event->getSenderId();
         //TODO: try to find user and configure locale
 
         if ($this->client->isMessageEvent($event)) {
@@ -101,26 +107,24 @@ class MessengerController extends Controller
      */
     protected function handlePostBack($event)
     {
-        $senderId = $event->getSenderId();
         $payload = $event->getPostback()->getPayload();
 
         switch($payload) {
             case 'action_start':
                 $this->createOrUpdateUser(
-                    $senderId,
-                    $this->getUser($senderId)
+                    $this->getUserProfile($this->userId)
                 );
 
-                $this->bot->greet($senderId);
+                $this->bot->greet($this->userId);
                 break;
             case 'action_show_watch_list':
-                $this->sendWatchList($senderId);
+                $this->sendWatchList();
                 break;
             case 'action_show_help':
                 //TODO: implement
                 break;
             default:
-                $this->handlePostBackButton($senderId, $payload);
+                $this->handlePostBackButton($payload);
                 break;
         }
     }
@@ -128,7 +132,7 @@ class MessengerController extends Controller
     /**
      * @param $payload
      */
-    protected function handlePostBackButton($senderId, $payload): void
+    protected function handlePostBackButton($payload): void
     {
         $payload = explode(':', $payload);
 
@@ -138,10 +142,10 @@ class MessengerController extends Controller
 
             switch ($action) {
                 case MessengerChat::POSTBACK_ACTION_REMOVE_ITEM:
-                    if ($this->removeItemFromWatchlist($identifier, $senderId)) {
-                        $this->bot->itemRemoved($senderId);
+                    if ($this->removeItemFromWatchlist($identifier)) {
+                        $this->bot->itemRemoved($this->userId);
                     } else {
-                        $this->bot->sorry($senderId);
+                        $this->bot->sorry($this->userId);
                     }
                     break;
             }
@@ -151,31 +155,31 @@ class MessengerController extends Controller
     /**
      * @param $event
      * @throws \GuzzleHttp\Exception\GuzzleException
+     * @throws \Kerox\Messenger\Exception\MessengerException
      */
     protected function handleMessage($event)
     {
         $message = $event->getMessage();
-        $senderId = $event->getSenderId();
 
         if ($message->hasText()) {
             $input = $message->getText();
 
             if ($this->store->isValidStoreFrontURL($input)) {
                 if ($productData = $this->store->getGameDataByURL($input)) {
-                    if ($productId = $this->createOrUpdateWatchItem($productData, $senderId)) {
-                        $this->bot->itemAdded($senderId);
+                    if ($productId = $this->createOrUpdateWatchItem($productData)) {
+                        $this->bot->itemAdded($this->userId);
 
                         $productCard = $this->getProductCardFromRawData($productData);
-                        $this->bot->sendProductCards($senderId, [$productCard]);
+                        $this->bot->sendProductCards($this->userId, [$productCard]);
                         die();
                     } else {
-                        $this->bot->sorry($senderId);
+                        $this->bot->sorry($this->userId);
                     }
                 } else {
-                    $this->bot->wrongInput($senderId);
+                    $this->bot->wrongInput($this->userId);
                 }
             } else {
-                $this->bot->wrongInput($senderId);
+                $this->bot->wrongInput($this->userId);
             }
         }
 
@@ -189,16 +193,14 @@ class MessengerController extends Controller
     }
 
     /**
-     * Sends a user's watchlist
-     *
-     * @param $senderId
+     * @throws \Kerox\Messenger\Exception\MessengerException
      */
-    protected function sendWatchList($senderId): void
+    protected function sendWatchList(): void
     {
         //TODO: handle carousel card's max count
         // Up to 10 generic templates in one carousel
         // See eloquent batching
-        $products = $this->getProductsByUserId($senderId);
+        $products = $this->getUserProducts();
 
         if ($products->isNotEmpty()) {
             $cards = [];
@@ -215,10 +217,10 @@ class MessengerController extends Controller
                     return $a['bubble'] <=> $b['bubble'];
                 });
 
-                $this->bot->sendProductCards($senderId, array_column($cards, 'payload'));
+                $this->bot->sendProductCards($this->userId, array_column($cards, 'payload'));
             }
         } else {
-            $this->bot->emptyWatchList($senderId);
+            $this->bot->emptyWatchList($this->userId);
         }
     }
 
@@ -243,32 +245,29 @@ class MessengerController extends Controller
      * @return \Kerox\Messenger\Response\UserResponse
      * @throws \Kerox\Messenger\Exception\MessengerException
      */
-    protected function getUser(int $uid)
+    protected function getUserProfile(int $uid)
     {
         return $this->client->getUserProfile($uid);
     }
 
     /**
-     * @param $senderId
-     * @return array
+     * @return Collection
      */
-    protected function getProductsByUserId($senderId): Collection
+    protected function getUserProducts(): Collection
     {
-        return MessengerWatchItem::where('recipient_id', $senderId)
-            ->get();
+        return MessengerWatchItem::where('recipient_id', $this->userId)->get();
     }
 
     /**
-     * @param int $recipientId
      * @param \Kerox\Messenger\Response\UserResponse $user
      */
-    protected function createOrUpdateUser(int $recipientId, $user)
+    protected function createOrUpdateUser($user)
     {
         $userModel = MessengerUser::firstOrNew(
-            ['recipient_id' => $recipientId]
+            ['recipient_id' => $this->userId]
         );
 
-        $userModel->recipient_id = $recipientId;
+        $userModel->recipient_id = $this->userId;
         $userModel->first_name = $user->getFirstName();
         $userModel->last_name = $user->getLastName();
         $userModel->locale = $user->getLocale();
@@ -281,14 +280,14 @@ class MessengerController extends Controller
      * @param int $userId
      * @return int
      */
-    protected function createOrUpdateWatchItem(array $item, int $userId): int
+    protected function createOrUpdateWatchItem(array $item): int
     {
         $itemModel = MessengerWatchItem::firstOrNew([
-            'recipient_id' => $userId,
+            'recipient_id' => $this->userId,
             'product_id' => $item['api-handle']
         ]);
 
-        $itemModel->recipient_id = $userId;
+        $itemModel->recipient_id = $this->userId;
         $itemModel->product_id = $item['api-handle'] ?? null;
         $itemModel->name = $item['name'] ?? null;
         $itemModel->image = $item['image'] ?? null;
@@ -304,12 +303,11 @@ class MessengerController extends Controller
 
     /**
      * @param string $productId
-     * @param int $userId
      * @return mixed
      */
-    public function removeItemFromWatchlist(string $productId, int $userId)
+    public function removeItemFromWatchlist(string $productId)
     {
-        return MessengerWatchItem::where('recipient_id', $userId)
+        return MessengerWatchItem::where('recipient_id', $this->userId)
             ->where('product_id', $productId)
             ->delete();
     }
