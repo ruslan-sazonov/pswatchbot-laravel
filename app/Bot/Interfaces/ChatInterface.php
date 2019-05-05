@@ -9,5 +9,7 @@ interface ChatInterface
     public function greet($userId);
     public function wrongInput($userId);
     public function itemAdded($userId);
+    public function itemRemoved($userId);
     public function sorry($userId);
+    public function emptyWatchList($userId);
 }

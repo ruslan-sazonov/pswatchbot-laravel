@@ -4,7 +4,7 @@ use Illuminate\Support\Facades\Schema;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Database\Migrations\Migration;
 
-class AddFieldsMessengerWatchItemsTable extends Migration
+class AddRawDataFieldMessengerWatchItemsTable extends Migration
 {
     /**
      * Run the migrations.
@@ -14,7 +14,7 @@ class AddFieldsMessengerWatchItemsTable extends Migration
     public function up()
     {
         Schema::table('messenger_watch_items', function (Blueprint $table) {
-            $table->json('prices')->after('api_url')->nullable();
+            $table->json('raw_data')->after('prices')->nullable();
         });
     }
 
@@ -26,7 +26,7 @@ class AddFieldsMessengerWatchItemsTable extends Migration
     public function down()
     {
         Schema::table('messenger_watch_items', function (Blueprint $table) {
-            $table->removeColumn('prices');
+            $table->removeColumn('raw_data');
         });
     }
 }

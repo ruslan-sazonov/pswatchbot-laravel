@@ -20,6 +20,7 @@ class MessengerWatchItem extends Model
         'store_url',
         'api_url',
         'prices',
+        'raw_data',
         'fetched_at'
     ];
 
@@ -43,10 +44,27 @@ class MessengerWatchItem extends Model
 
     /**
      * @param $value
+     * @return array
+     */
+    public function getRawDataAttribute($value): array
+    {
+        return json_decode($value, true);
+    }
+
+    /**
+     * @param $value
      */
     public function setPricesAttribute($value): void
     {
         $this->attributes['prices'] = json_encode($value);
+    }
+
+    /**
+     * @param $value
+     */
+    public function setRawDataAttribute($value): void
+    {
+        $this->attributes['raw_data'] = json_encode($value);
     }
 
     public function user()

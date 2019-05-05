@@ -1,11 +1,13 @@
 <?php
 
 
-namespace App\Bot\Interfaces\DTO;
+namespace App\PSN\Interfaces\DTO;
 
 
 interface ProductInterface
 {
+
+    public function getId(): string;
 
     public function getTitleAsText(): string;
 

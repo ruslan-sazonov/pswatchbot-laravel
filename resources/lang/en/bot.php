@@ -8,4 +8,6 @@ return [
     'wrong_input_msg_2' => 'Try PlayStation Store URL if you want to update your watch list.',
     'added_msg' => "Great!\nThis thing has been added to your Watchlist! Stay tuned.",
     'sorry_msg' => "Sorry, I can't do this now. You can try a little bit later.",
+    'empty_watchlist' => 'Your watch list is empty.',
+    'removed_product' => 'Your Watchlist has been updated!'
 ];

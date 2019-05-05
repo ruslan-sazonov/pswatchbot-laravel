@@ -4,11 +4,13 @@ namespace App\Http\Controllers\Api;
 
 
 use App\Bot\Manager;
-use App\Bot\DTO\Product;
+use App\Bot\Messenger\MessengerChat;
+use App\PSN\DTO\Product;
 use App\PSN\Store as PsnStore;
 use App\Models\MessengerWatchItem;
 use App\Models\MessengerUser;
 use App\Http\Controllers\Controller;
+use Illuminate\Support\Collection;
 
 class MessengerController extends Controller
 {
@@ -112,11 +114,37 @@ class MessengerController extends Controller
                 $this->bot->greet($senderId);
                 break;
             case 'action_show_watch_list':
-                //TODO: implement
+                $this->sendWatchList($senderId);
                 break;
             case 'action_show_help':
                 //TODO: implement
                 break;
+            default:
+                $this->handlePostBackButton($senderId, $payload);
+                break;
+        }
+    }
+
+    /**
+     * @param $payload
+     */
+    protected function handlePostBackButton($senderId, $payload): void
+    {
+        $payload = explode(':', $payload);
+
+        if (count($payload) == 2) {
+            $action = $payload[0];
+            $identifier = $payload[1];
+
+            switch ($action) {
+                case MessengerChat::POSTBACK_ACTION_REMOVE_ITEM:
+                    if ($this->removeItemFromWatchlist($identifier, $senderId)) {
+                        $this->bot->itemRemoved($senderId);
+                    } else {
+                        $this->bot->sorry($senderId);
+                    }
+                    break;
+            }
         }
     }
 
@@ -137,11 +165,9 @@ class MessengerController extends Controller
                     if ($productId = $this->createOrUpdateWatchItem($productData, $senderId)) {
                         $this->bot->itemAdded($senderId);
 
-                        $product = new Product($productData);
-                        $productCard = $this->bot->getSingleProductCard($product);
-                        $this->bot->sendProductCard($senderId, $productCard);
+                        $productCard = $this->getProductCardFromRawData($productData);
+                        $this->bot->sendProductCards($senderId, [$productCard]);
                         die();
-
                     } else {
                         $this->bot->sorry($senderId);
                     }
@@ -163,6 +189,51 @@ class MessengerController extends Controller
     }
 
     /**
+     * Sends a user's watchlist
+     *
+     * @param $senderId
+     */
+    protected function sendWatchList($senderId): void
+    {
+        $products = $this->getProductsByUserId($senderId);
+
+        if ($products->isNotEmpty()) {
+            $cards = [];
+
+            foreach ($products as $product) {
+                $cards[] = [
+                    'bubble' => Product::isDiscountAvailable($product->raw_data) ? -1 : 1,
+                    'payload' => $this->getProductCardFromRawData($product->raw_data, true)
+                ];
+            }
+
+            if (count($cards)) {
+                usort($cards, function ($a, $b) {
+                    return $a['bubble'] <=> $b['bubble'];
+                });
+
+                $this->bot->sendProductCards($senderId, array_column($cards, 'payload'));
+            }
+        } else {
+            $this->bot->emptyWatchList($senderId);
+        }
+    }
+
+    /**
+     * @param array $data
+     * @param bool $isWatchlist
+     * @return \Kerox\Messenger\Model\Message\Attachment\Template\Element\GenericElement
+     * @throws \Kerox\Messenger\Exception\MessengerException
+     */
+    protected function getProductCardFromRawData(array $data, bool $isWatchlist = false)
+    {
+        return $this->bot->getSingleProductCard(
+            new Product($data),
+            $isWatchlist
+        );
+    }
+
+    /**
      * Get a user info
      *
      * @param int $uid
@@ -172,6 +243,16 @@ class MessengerController extends Controller
     protected function getUser(int $uid)
     {
         return $this->client->getUserProfile($uid);
+    }
+
+    /**
+     * @param $senderId
+     * @return array
+     */
+    protected function getProductsByUserId($senderId): Collection
+    {
+        return MessengerWatchItem::where('recipient_id', $senderId)
+            ->get();
     }
 
     /**
@@ -211,9 +292,22 @@ class MessengerController extends Controller
         $itemModel->store_url = $item['store-url'] ?? null;
         $itemModel->api_url = $item['api-url'] ?? null;
         $itemModel->prices = $item['prices'] ?? null;
+        $itemModel->raw_data = $item ?? null;
         $itemModel->fetched_at = $item['fetched-at'] ?? null;
         $itemModel->save();
 
         return $itemModel->id;
+    }
+
+    /**
+     * @param string $productId
+     * @param int $userId
+     * @return mixed
+     */
+    public function removeItemFromWatchlist(string $productId, int $userId)
+    {
+        return MessengerWatchItem::where('recipient_id', $userId)
+            ->where('product_id', $productId)
+            ->delete();
     }
 }

@@ -22,7 +22,7 @@ class Dialogs
     public function getWrongInput(): array
     {
         return [
-            //TODO: emoji
+            Emoji::thinkingFace(),
             __('bot.wrong_input_msg_1'),
             __('bot.wrong_input_msg_2'),
         ];
@@ -36,11 +36,28 @@ class Dialogs
         ];
     }
 
+    public function getItemRemoved(): array
+    {
+        return [
+            Emoji::okHand(),
+            __('bot.removed_product')
+        ];
+    }
+
     public function getSorry(): array
     {
         return [
-            //TODO: emoji
-            'bot.sorry_msg'
+            Emoji::pensiveFace(),
+            __('bot.sorry_msg')
+        ];
+    }
+
+    public function getEmptyWatchList(): array
+    {
+        return [
+            Emoji::thinkingFace(),
+            __('bot.empty_watchlist'),
+            __('bot.greeting_msg_4')
         ];
     }
 }
