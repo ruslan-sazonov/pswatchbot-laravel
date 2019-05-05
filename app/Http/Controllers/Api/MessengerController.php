@@ -44,8 +44,8 @@ class MessengerController extends Controller
     {
         ini_set("xdebug.overload_var_dump", "off");
         $this->bot = $botManager->messenger();
-        $this->store = $store;
         $this->client = $this->bot->client();
+        $this->store = $store;
     }
 
     public function challenge()
@@ -73,6 +73,11 @@ class MessengerController extends Controller
         response('OK', 200);
     }
 
+    protected function configureLocale(): void
+    {
+        //TODO: try to find user and configure locale
+    }
+
     /**
      * @param $event
      * @throws \GuzzleHttp\Exception\GuzzleException
@@ -80,7 +85,7 @@ class MessengerController extends Controller
     protected function handleEvent($event)
     {
         $this->userId = $event->getSenderId();
-        //TODO: try to find user and configure locale
+        $this->configureLocale();
 
         if ($this->client->isMessageEvent($event)) {
             try {
