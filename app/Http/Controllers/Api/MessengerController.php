@@ -10,6 +10,7 @@ use App\PSN\Store as PsnStore;
 use App\Models\MessengerWatchItem;
 use App\Models\MessengerUser;
 use App\Http\Controllers\Controller;
+use Kerox\Messenger\Model\Message\Attachment\Template\Element\GenericElement;
 use Illuminate\Support\Collection;
 
 class MessengerController extends Controller
@@ -235,7 +236,7 @@ class MessengerController extends Controller
      * @return \Kerox\Messenger\Model\Message\Attachment\Template\Element\GenericElement
      * @throws \Kerox\Messenger\Exception\MessengerException
      */
-    protected function getProductCardFromRawData(array $data, bool $isWatchlist = false)
+    protected function getProductCardFromRawData(array $data, bool $isWatchlist = false): GenericElement
     {
         return $this->bot->getSingleProductCard(
             new Product($data),
@@ -260,7 +261,7 @@ class MessengerController extends Controller
      */
     protected function getUserProducts(): Collection
     {
-        return MessengerWatchItem::where('recipient_id', $this->userId)->get();
+        return MessengerUser::getWatchlist($this->userId);
     }
 
     /**
@@ -268,6 +269,7 @@ class MessengerController extends Controller
      */
     protected function createOrUpdateUser($user)
     {
+        //TODO: move to model
         $userModel = MessengerUser::firstOrNew(
             ['recipient_id' => $this->userId]
         );
@@ -287,6 +289,7 @@ class MessengerController extends Controller
      */
     protected function createOrUpdateWatchItem(array $item): int
     {
+        //TODO: move to model
         $itemModel = MessengerWatchItem::firstOrNew([
             'recipient_id' => $this->userId,
             'product_id' => $item['api-handle']
